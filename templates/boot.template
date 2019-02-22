@@ -7,7 +7,7 @@ J _trap
 
 .section .boot
 _boot:
-li sp, {{ stack_pointer_loc }}
+li sp, 0x{{ stack_pointer_loc }}
 call main
 J _trap
 

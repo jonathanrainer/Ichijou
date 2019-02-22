@@ -1,3 +1,5 @@
+import subprocess
+
 from pathlib import Path
 from jinja2 import Template
 
@@ -40,5 +42,18 @@ class CompilerInterface(object):
             output_file_pointer.write(template.render(**params))
         return output_path
 
+    def compile_benchmark(self, benchmark_path, linker_file_path, boot_file_path, temporary_path, output_file_name):
+        output_file = Path(temporary_path, output_file_name)
+        #  Compile it
+        subprocess.run(
+            "{0}/riscv32-unknown-elf-gcc -nostartfiles {1} {2} -T {3} -o {4}".format(
+                self.riscv_binary_prefix,
+                boot_file_path,
+                benchmark_path,
+                linker_file_path,
+                str(output_file.absolute())
+            ), shell=True
+        )
+        return output_file
 
 
