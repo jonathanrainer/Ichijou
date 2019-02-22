@@ -1,0 +1,17 @@
+.section .reset
+J _boot
+
+.section .illegal_instruction
+_illegal_instruction:
+J _trap
+
+.section .boot
+_boot:
+li sp, {{ stack_pointer_loc }}
+call main
+J _trap
+
+.section .trap
+_trap:
+J _trap
+
