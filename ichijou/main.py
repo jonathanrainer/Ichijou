@@ -27,7 +27,8 @@ class Ichijou(object):
         # Create a Boot File
         boot_file_location = self.compiler_interface.create_boot_program(temporary_file_location, "ff00")
         # Create Linker Script
-        linker_file_location = self.compiler_interface.create_linker_file()
+        linker_file_location = self.compiler_interface.create_linker_file(temporary_file_location, 2**16, 2**16,
+                                                                          0x4000)
         # Run compile option
         # Clean up the temporary files
         # Return the address of the ELF file generated

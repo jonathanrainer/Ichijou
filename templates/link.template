@@ -6,7 +6,7 @@ MEMORY
 {
     instruction     (rx)   : ORIGIN = {{ program_start }}, LENGTH = {{ instruction_mem_size }}
     data            (rw!x) : ORIGIN = {{ data_start }}, LENGTH = {{ data_mem_size }}
-    stack           (rw!x) : ORIGIN = {{ data_start }} + {{ data_mem_size + stack_size }}, LENGTH = {{ stack_size }}
+    stack           (rw!x) : ORIGIN = {{ data_start + data_mem_size + stack_size }}, LENGTH = {{ stack_size }}
 }
 
 SECTIONS
