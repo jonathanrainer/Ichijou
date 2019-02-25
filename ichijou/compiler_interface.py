@@ -13,13 +13,13 @@ class CompilerInterface(object):
     def __init__(self, riscv_binary_prefix):
         self.riscv_binary_prefix = riscv_binary_prefix
 
-    def create_linker_file(self, temporary_path, instruction_memory_size, data_memory_size, stack_size):
+    def create_linker_file(self, temporary_path, instruction_memory_size, data_memory_size, stack_size, data_offset):
         return self.create_file_from_template(
             self.linker_file_template, temporary_path, "link.ld",
             {
-                "program_start": 0x0,
+                "program_start": 0x200,
                 "instruction_mem_size": instruction_memory_size,
-                "data_start": 0x100000,
+                "data_start": data_offset,
                 "data_mem_size": data_memory_size,
                 "stack_size": stack_size,
             }
