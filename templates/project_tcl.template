@@ -5,15 +5,15 @@ set kuugaDir            [file join $thisDir .. .. .. Kuuga]
 set godaiDir	        [file join $kuugaDir Godai]
 set gouramDir 	        [file join $kuugaDir Gouram]
 set core2AXIDir	        [file join $kuugaDir core2axi]
-set instContents        [file join $thisDir mem {{ instruction_memory_file }}]
-set dataContents        [file join $thisDir mem {{ data_memory_file }}]
+set instContents        [file join $thisDir .. mem {{ instruction_memory_file }}]
+set dataContents        [file join $thisDir .. mem {{ data_memory_file }}]
 set finalBitfile        [file join $thisDir .. .. output {{ benchmark }}.bit]
 
 set projectName {{ project_name }}
 
 # Check whether the project exists or not, if it doesn't then it needs to be created
 
-if {![file exist [file join workDir {{ project_name }}.xpr ]] || {{ re_synth }} {
+if {![file exist [file join workDir {{ project_name }}.xpr ]] || {{ resynth }}} {
 
     source [file join $godaiDir scripts godai_manifest.tcl]
     source [file join $gouramDir scripts gouram_manifest.tcl]
@@ -64,7 +64,7 @@ if {![file exist [file join workDir {{ project_name }}.xpr ]] || {{ re_synth }} 
 
 # If we need to re-synthesise and re-implement then do both of those so we have access to the bitfile
 
-if {get_property NEEDS_REFRESH [get_runs impl_1]} {
+if { [get_property NEEDS_REFRESH [get_runs impl_1]] || [get_property STATUS [get_runs synth_1]] == "Not started" } {
     launch_runs synth_1
     wait_on_run synth_1
     launch_runs impl_1
@@ -72,9 +72,9 @@ if {get_property NEEDS_REFRESH [get_runs impl_1]} {
 }
 
 # Create the baseline bit file & probes file and write them out to a known location
-set raw_bit_file [file join $vivadoFiles {{ benchmark }}_raw.bit]
-set raw_probes_file [file join $vivadoFiles {{ benchmark }}_debug_probes.ltx]
-set raw_mmi [file join $vivadoFiles layout.mmi]
+set raw_bit_file [file join $thisDir {{ benchmark }}_raw.bit]
+set raw_probes_file [file join $thisDir {{ benchmark }}_debug_probes.ltx]
+set raw_mmi [file join $thisDir layout.mmi]
 open_run impl_1
 write_bitstream -force $raw_bit_file
 write_debug_probes -force $raw_probes_file

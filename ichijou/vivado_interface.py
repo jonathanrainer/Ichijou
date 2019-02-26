@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 from pathlib import Path
 
@@ -15,20 +16,24 @@ class MEMFileGenerator(object):
         for c, _ in enumerate(contents["data"]):
             contents["data"][c] = (contents["data"][c][0] - data_offset // 4, contents["data"][c][1])
         for memory_name, file_contents in contents.items():
-            counter = file_contents[0][0]
-            results = ["@" + f"{counter:0{8}x}"]
-            for pair in file_contents:
-                if pair[0] != counter:
-                    new_addr = pair[0]
-                    results.append("@" + f"{new_addr:0{8}x}")
-                for instruction in pair[1]:
-                    results.append(instruction)
-                    counter += 1
-            file_path = Path(temp_dir, "{}_{}_memory.mem".format(benchmark_name, memory_name))
-            with open(file_path, "w") as mem_fp:
-                for file_line in results:
-                    mem_fp.write(file_line + '\n')
-            file_paths.append((sum([1 for x in results if x[0] != "@"]), file_path))
+            output_file_name = Path(temp_dir, "{}_{}_memory.mem".format(benchmark_name, memory_name))
+            if not os.path.isfile(output_file_name):
+                counter = file_contents[0][0]
+                results = ["@" + f"{counter:0{8}x}"]
+                for pair in file_contents:
+                    if pair[0] != counter:
+                        new_addr = pair[0]
+                        results.append("@" + f"{new_addr:0{8}x}")
+                    for instruction in pair[1]:
+                        results.append(instruction)
+                        counter += 1
+                with open(output_file_name, "w") as mem_fp:
+                    for file_line in results:
+                        mem_fp.write(file_line + '\n')
+            else:
+                with open(output_file_name, "r") as mem_fp:
+                    results = mem_fp.readlines()
+            file_paths.append((sum([1 for x in results if x[0] != "@"]), output_file_name))
         return file_paths
 
 
@@ -47,11 +52,17 @@ class VivadoInterface(object):
         if self.check_for_resynth(mem_file_paths):
             top_level = self.create_new_top_level(temporary_files_path, Path(temporary_path, "..", "templates"),
                                                   top_level_module, mem_file_paths)
-        print("Hello World")
-        self.create_tcl_script(temporary_files_path, Path(temporary_path, "..", "templates"), mem_file_paths,
-                               benchmark, top_level is not None,  top_level, top_level_module
+        tcl_script_path = self.create_tcl_script(temporary_files_path, Path(temporary_path, "..", "templates"),
+                                                 mem_file_paths,
+                                                 benchmark, top_level is not None,  top_level, top_level_module
                                )
         # Call the shell script passing in the correct arguments
+        os.makedirs(Path(temporary_path, "..", "output"), exist_ok=True)
+        subprocess.run(
+            "{0} {1}".format(
+                Path(temporary_path, "..", "scripts", "sh", "run_vivado.sh").absolute(), tcl_script_path),
+            shell=True
+        )
         return
 
     def check_for_resynth(self, mem_file_paths):
@@ -85,7 +96,7 @@ class VivadoInterface(object):
                 "data_memory_file": mem_file_paths[1][1].name,
                 "benchmark": benchmark_name,
                 "project_name": self.project_name,
-                "resynth": 1 if resynth else 0,
+                "resynth": "1" if resynth else "0",
                 "top_level_file": top_level_file
 
             }
