@@ -1,6 +1,5 @@
 import sys
 import os
-import shutil
 
 from pathlib import Path
 
@@ -28,7 +27,7 @@ class Ichijou(object):
             self.elf_file_interface.extract_mem_file_elements(executable_file), experiment_directory,
             benchmark_path.stem, data_offset)
         # Open up Vivado with the correct design
-        self.vivado_interface.open_vivado_with_script(mem_file_paths, experiment_directory, benchmark_path.stem)
+        self.vivado_interface.setup_experiment(mem_file_paths, experiment_directory, benchmark_path.stem)
         #####################################################################
         # Take any measurements from the ILA that are necessary (timings etc.)
         # Process the output into graphs etc.

@@ -1,19 +1,19 @@
 # Get the directory where this script resides
 set thisDir 	        [file dirname [info script]]
-set workDir 	        [file join $thisDir .. vivado_project]
-set kuugaDir            [file join $thisDir .. .. .. Kuuga]
+set workDir 	        [file join $thisDir {{ project_location_join_syntax }}]
+set kuugaDir            [file join $thisDir {{ kuuga_location_join_syntax }}]
 set godaiDir	        [file join $kuugaDir Godai]
 set gouramDir 	        [file join $kuugaDir Gouram]
 set core2AXIDir	        [file join $kuugaDir core2axi]
 set instContents        [file join $thisDir .. mem {{ instruction_memory_file }}]
 set dataContents        [file join $thisDir .. mem {{ data_memory_file }}]
-set finalBitfile        [file join $thisDir .. .. output {{ benchmark }}.bit]
+set finalBitfile        [file join $thisDir .. output {{ benchmark }}.bit]
 
 set projectName {{ project_name }}
 
 # Check whether the project exists or not, if it doesn't then it needs to be created
 
-if {![file exist [file join workDir {{ project_name }}.xpr ]] || {{ resynth }}} {
+if {![file exist [file join $workDir {{ project_name }}.xpr ]] || {{ resynth }}} {
 
     source [file join $godaiDir scripts godai_manifest.tcl]
     source [file join $gouramDir scripts gouram_manifest.tcl]
@@ -59,15 +59,15 @@ if {![file exist [file join workDir {{ project_name }}.xpr ]] || {{ resynth }}} 
     source [file join $kuugaDir scripts block_diagrams kuuga_full_system.tcl]
 
 } else {
-    open_project [file join workDir $projectName.xpr]
+    open_project [file join $workDir {{ project_name }}.xpr]
 }
 
 # If we need to re-synthesise and re-implement then do both of those so we have access to the bitfile
 
 if { [get_property NEEDS_REFRESH [get_runs impl_1]] || [get_property STATUS [get_runs synth_1]] == "Not started" } {
-    launch_runs synth_1
+    launch_runs -jobs 4 synth_1
     wait_on_run synth_1
-    launch_runs impl_1
+    launch_runs -jobs 4 impl_1
     wait_on_run impl_1
 }
 
@@ -77,33 +77,33 @@ set raw_probes_file [file join $thisDir {{ benchmark }}_debug_probes.ltx]
 set raw_mmi [file join $thisDir layout.mmi]
 open_run impl_1
 write_bitstream -force $raw_bit_file
-write_debug_probes -force $raw_probes_file
+#write_debug_probes -force $raw_probes_file
 write_mem_info -force $raw_mmi
 
 # Program the Device & Extract the Triggers to a file
-open_hw
-disconnect_hw_server -quiet
-connect_hw_server -url localhost:12345
-current_hw_target [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
-set_property PARAM.FREQUENCY 3750000 [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
-open_hw_target
-set_property PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
-set_property FULL_PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
-set_property PROGRAM.FILE $raw_bit_file [get_hw_devices xc7vx485t_0]
-program_hw_devices [get_hw_devices xc7vx485t_0]
-refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
-set ilaTriggers [file join $thisDir ila_triggers.tas]
-run_hw_ila -force -file $ilaTriggers [get_hw_ilas hw_ila_1]
+#open_hw
+#disconnect_hw_server -quiet
+#connect_hw_server -url localhost:12345
+#current_hw_target [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+#set_property PARAM.FREQUENCY 3750000 [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+#open_hw_target
+#set_property PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+#set_property FULL_PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+#set_property PROGRAM.FILE $raw_bit_file [get_hw_devices xc7vx485t_0]
+#program_hw_devices [get_hw_devices xc7vx485t_0]
+#refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
+#set ilaTriggers [file join $thisDir ila_triggers.tas]
+#run_hw_ila -force -file $ilaTriggers [get_hw_ilas hw_ila_1]
 
 # Add triggers into the design
-current_design impl_1
-refresh_design
-apply_hw_ila_trigger $ilaTriggers
-set triggersBitfile [file join $thisDir {{ benchmark }}_with_triggers.bit]
-write_bitstream -force $triggersBitfile
+#current_design impl_1
+#refresh_design
+#apply_hw_ila_trigger $ilaTriggers
+#set triggersBitfile [file join $thisDir {{ benchmark }}_with_triggers.bit]
+#write_bitstream -force $triggersBitfile
 
 # Run updatemem with mem files from params
-exec updatemem -debug -force -meminfo $raw_mmi -bit $triggersBitfile \
+exec updatemem -debug -force -meminfo $raw_mmi -bit $raw_bit_file \
     -proc xpm_inst_mem/xpm_memory_base_inst -data $instContents \
     -proc xpm_data_mem/xpm_memory_base_inst -data $dataContents \
     -out $finalBitfile

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import re
 
 from pathlib import Path
 
@@ -18,7 +19,7 @@ class MEMFileGenerator(object):
         for memory_name, file_contents in contents.items():
             output_file_name = Path(temp_dir, "{}_{}_memory.mem".format(benchmark_name, memory_name))
             if not os.path.isfile(output_file_name):
-                counter = file_contents[0][0]
+                counter = 0 if len(file_contents) == 0 else file_contents[0][0]
                 results = ["@" + f"{counter:0{8}x}"]
                 for pair in file_contents:
                     if pair[0] != counter:
@@ -39,28 +40,28 @@ class MEMFileGenerator(object):
 
 class VivadoInterface(object):
 
-    project_name = "KuugaTest"
+    base_project_name = "KuugaTest"
     mem_file_instruction_limit = 32768/32
 
-    def open_vivado_with_script(self, mem_file_paths, temporary_path, benchmark):
+    def setup_experiment(self, mem_file_paths, temporary_path, benchmark):
         # Generate necessary files (top-level design, tcl script to run the experiment)
-        top_level = None
-        top_level_module = "kuuga_top"
+        top_level = Path(temporary_path, "..", "..", "..", "Kuuga", "rtl", "kuuga_top.v")
+        top_level_module = "kuuga"
         temporary_files_path = Path(temporary_path, "vivado_files")
         os.makedirs(temporary_files_path, exist_ok=True)
         # Check if the top-level file needs re-writing
         if self.check_for_resynth(mem_file_paths):
-            top_level = self.create_new_top_level(temporary_files_path, Path(temporary_path, "..", "templates"),
-                                                  top_level_module, mem_file_paths)
-        tcl_script_path = self.create_tcl_script(temporary_files_path, Path(temporary_path, "..", "templates"),
-                                                 mem_file_paths,
-                                                 benchmark, top_level is not None,  top_level, top_level_module
-                               )
+            top_level = self.create_new_top_level(
+                temporary_files_path, Path(temporary_path, "..", "..", "templates"), top_level_module, mem_file_paths)
+        tcl_setup_script_path = self.create_tcl_setup_script(
+            temporary_files_path,  Path(temporary_path, "..", "..", "templates"), mem_file_paths,
+            benchmark, self.check_for_resynth(mem_file_paths),  top_level, top_level_module
+        )
         # Call the shell script passing in the correct arguments
-        os.makedirs(Path(temporary_path, "..", "output"), exist_ok=True)
+        os.makedirs(Path(temporary_path, "output"), exist_ok=True)
         subprocess.run(
             "{0} {1}".format(
-                Path(temporary_path, "..", "scripts", "sh", "run_vivado.sh").absolute(), tcl_script_path),
+                Path(temporary_path, "..", "..", "scripts", "sh", "run_vivado.sh").absolute(), tcl_setup_script_path),
             shell=True
         )
         return
@@ -84,20 +85,28 @@ class VivadoInterface(object):
             }
         )
 
-    def create_tcl_script(self, temporary_files_path, templates_path, mem_file_paths, benchmark_name,
+    def create_tcl_setup_script(self, temporary_files_path, templates_path, mem_file_paths, benchmark_name,
                           resynth, top_level_file=None, top_level_module=None):
+        project_location = Path(temporary_files_path, "..", "vivado_project") \
+            if resynth else Path(temporary_files_path, "..", "..", "common")
         return TemplateInterface.create_file_from_template(
             Path(templates_path, "project_tcl.template"),
             temporary_files_path,
-            "run_experiment.tcl",
+            "setup_experiment_environment.tcl",
             {
                 "top_level_module": top_level_module,
                 "instruction_memory_file": mem_file_paths[0][1].name,
                 "data_memory_file": mem_file_paths[1][1].name,
                 "benchmark": benchmark_name,
-                "project_name": self.project_name,
+                "project_location_join_syntax": re.sub("{}".format(os.sep), " ",
+                                                       str(project_location.relative_to(temporary_files_path))),
+                "project_name": "{}_{}".format(self.base_project_name, benchmark_name) if resynth
+                else self.base_project_name,
                 "resynth": "1" if resynth else "0",
-                "top_level_file": top_level_file
-
+                "top_level_file": top_level_file,
+                "kuuga_location_join_syntax": re.sub(
+                    "{}".format(os.sep), " ", str(Path(temporary_files_path, "..", "..", "..", "..",
+                                                       "Kuuga").relative_to(temporary_files_path))
+                )
             }
         )
