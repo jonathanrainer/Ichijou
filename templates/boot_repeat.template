@@ -9,6 +9,9 @@ J _trap
 _boot:
 li sp, 0x{{ stack_pointer_loc }}
 call main
+lw ra, +0(zero)
+li sp, 0x{{ stack_pointer_loc }}
+call main
 J _trap
 
 .section .trap

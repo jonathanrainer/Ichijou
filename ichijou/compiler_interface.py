@@ -9,6 +9,8 @@ class CompilerInterface(object):
 
     riscv_binary_prefix = ""
     boot_file_template = Path("~", "Documents", "PhD", "Ichijou", "templates", "boot.template").expanduser()
+    boot_file_repeat_template = Path("~", "Documents", "PhD", "Ichijou", "templates",
+                                     "boot_repeat.template").expanduser()
     linker_file_template = Path("~", "Documents", "PhD", "Ichijou", "templates", "link.template").expanduser()
 
     def __init__(self, riscv_binary_prefix):
@@ -26,13 +28,14 @@ class CompilerInterface(object):
             }
         )
 
-    def create_boot_program(self, temporary_path, stack_pointer_location):
+    def create_boot_program(self, temporary_path, stack_pointer_location, experiment_type):
         return TemplateInterface.create_file_from_template(
-            self.boot_file_template, temporary_path, "boot.S",
-            {
-                "stack_pointer_loc": stack_pointer_location
-            }
-        )
+                self.boot_file_repeat_template if experiment_type == "cc" else self.boot_file_template,
+                temporary_path, "boot.S",
+                {
+                    "stack_pointer_loc": stack_pointer_location
+                }
+            )
 
     def compile_benchmark(self, benchmark_path, linker_file_path, boot_file_path, temporary_path, output_file_name):
         output_file = Path(temporary_path, output_file_name)
