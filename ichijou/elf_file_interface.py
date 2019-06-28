@@ -35,3 +35,19 @@ class ELFFileInterface(object):
                  instructions)
             )
         return results
+
+    def extract_trigger_values(self, elf_file, experiment_type):
+        with open(str(elf_file.absolute()), 'rb') as elf_fp:
+            elf_file = ELFFile(elf_fp)
+            text_section = self.extract_sections([".text"], elf_file)[0]
+            starting_index = elf_file.get_section_by_name(".symtab").get_symbol_by_name("_boot")[0].entry.st_value // 4\
+                             - text_section[0]
+            counter_values = [
+                f"{((text_section[0] + i) * 4):0{4}x}" for i, x in enumerate( text_section[1][starting_index:],
+                                                                      start= starting_index)
+                if int(x[-2:], base=16) in [0xe3, 0x63, 0xef, 0x6f, 0xe7, 0x67]
+                ]
+        if experiment_type != "cc":
+            return [counter_values[0], counter_values[1], counter_values[-1]]
+        else:
+            return [counter_values[0], counter_values[0], counter_values[-1]]

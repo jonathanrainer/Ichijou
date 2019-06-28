@@ -10,19 +10,20 @@ from ichijou.template_interface import TemplateInterface
 class MEMFileGenerator(object):
 
     @staticmethod
-    def generate_new_mem_file(contents, temp_dir, benchmark_name, data_offset):
+    def generate_new_mem_file(contents, temp_dir, benchmark_name, data_offset, experiment_type):
         temp_dir = Path(temp_dir, "mem")
         os.makedirs(temp_dir, exist_ok=True)
         file_paths = []
         for c, _ in enumerate(contents["data"]):
             contents["data"][c] = (contents["data"][c][0] - data_offset // 4, contents["data"][c][1])
         for memory_name, file_contents in contents.items():
-            output_file_name = Path(temp_dir, "{}_{}_memory.mem".format(benchmark_name, memory_name))
+            output_file_name = Path(temp_dir, "{}_{}_{}_memory.mem".format(
+                benchmark_name, experiment_type, memory_name))
             if not os.path.isfile(output_file_name):
                 results = ["@0"]
                 counter = 0
                 if file_contents:
-                    for i in range(1, file_contents[0][0]):
+                    for i in range(0, file_contents[0][0]):
                         results.append("FFFFFFFF")
                     counter = file_contents[0][0]
                     for pair in file_contents:
@@ -45,30 +46,32 @@ class MEMFileGenerator(object):
 
 class VivadoInterface(object):
 
-    base_project_name = "KuugaTest"
+    base_project_name = "kuuga_experiment"
     mem_file_instruction_limit = 32768/32
+    experiment_type_mapper = {
+        "nc": ("kuuga_top_no_cache.v", "kuuga_nc", "kuuga_no_cache"),
+        "sc": ("kuuga_top_simple_cache.v", "kuuga_sc", "kuuga_simple_cache"),
+        "cc": ("kuuga_top_complex_cache.v", "kuuga_cc", "kuuga_complex_cache")
+    }
 
-    def setup_experiment(self, mem_file_paths, temporary_path, benchmark):
-        # Generate necessary files (top-level design, tcl script to run the experiment)
-        top_levels = [
-            (Path(temporary_path, "..", "..", "..", "Kuuga", "rtl", "kuuga_top_no_cache.v"), "kuuga_nc",
-             "kuuga_no_cache"),
-            (Path(temporary_path, "..", "..", "..", "Kuuga", "rtl", "kuuga_top_simple_cache.v"), "kuuga_sc",
-             "kuuga_simple_cache"),
-            (Path(temporary_path, "..", "..", "..", "Kuuga", "rtl", "kuuga_top_complex_cache.v"), "kuuga_cc",
-             "kuuga_complex_cache")
-        ]
+    def setup_experiment(self, mem_file_paths, temporary_path, benchmark, experiment_type, trigger_values):
+        experiment_names = self.experiment_type_mapper[experiment_type]
+        original_top_level = \
+            (Path(temporary_path, "..", "..", "..", "Kuuga", "rtl", experiment_names[0]), experiment_names[1],
+             experiment_names[2])
         temporary_files_path = Path(temporary_path, "vivado_files")
         os.makedirs(temporary_files_path, exist_ok=True)
         # Check if the top-level file needs re-writing
-        if self.check_for_resynth(mem_file_paths):
-            for index, old_top_level in enumerate(top_levels):
-                top_levels[index] = (self.create_new_top_level(
-                    temporary_files_path, Path(temporary_path, "..", "..", "templates"), old_top_level[1],
-                    mem_file_paths, old_top_level[2]), old_top_level[1], old_top_level[2])
-        tcl_setup_script_path = self.create_tcl_setup_script(
-            temporary_files_path,  Path(temporary_path, "..", "..", "templates"), mem_file_paths,
-            benchmark, self.check_for_resynth(mem_file_paths),  top_levels)
+        top_level = (self.create_new_top_level(
+            temporary_files_path, Path(temporary_path, "..", "..", "templates"), original_top_level[1],
+            mem_file_paths, original_top_level[2]), original_top_level[1], original_top_level[2])
+        results_files_path = Path(temporary_path, "results",
+                                  "{0}_{1}_ila_results.vcd".format(benchmark, experiment_type))
+        os.makedirs(results_files_path, exist_ok=True)
+        tcl_setup_script_path = self.create_tcl_script(temporary_files_path,
+                                                       Path(temporary_path, "..", "..", "templates"), mem_file_paths,
+                                                       benchmark, top_level, trigger_values, experiment_type,
+                                                       results_files_path)
         # Call the shell script passing in the correct arguments
         os.makedirs(Path(temporary_path, "output"), exist_ok=True)
         subprocess.run(
@@ -77,12 +80,6 @@ class VivadoInterface(object):
             shell=True
         )
         return
-
-    def check_for_resynth(self, mem_file_paths):
-        for pair in mem_file_paths:
-            if pair[0] > self.mem_file_instruction_limit:
-                return True
-        return False
 
     @staticmethod
     def create_new_top_level(temporary_files_path, templates_path, top_level_module, mem_file_paths, system_under_test):
@@ -98,27 +95,25 @@ class VivadoInterface(object):
             }
         )
 
-    def create_tcl_setup_script(self, temporary_files_path, templates_path, mem_file_paths, benchmark_name,
-                          resynth, top_levels):
-        project_location = Path(temporary_files_path, "..", "vivado_project") \
-            if resynth else Path(temporary_files_path, "..", "..", "common")
+    def create_tcl_script(self, temporary_files_path, templates_path, mem_file_paths, benchmark_name, top_level,
+                          trigger_values, experiment_type, output_file_location):
+        project_location = Path(temporary_files_path, "..", "vivado_project")
         return TemplateInterface.create_file_from_template(
-            Path(templates_path, "project_tcl.template"),
+            Path(templates_path, "experiment_tcl.template"),
             temporary_files_path,
             "setup_experiment_environment.tcl",
             {
-                "top_levels": top_levels,
+                "top_level": top_level,
                 "instruction_memory_file": mem_file_paths[0][1].name,
                 "data_memory_file": mem_file_paths[1][1].name,
                 "benchmark": benchmark_name,
                 "project_location_join_syntax": re.sub("{}".format(os.sep), " ",
                                                        str(project_location.relative_to(temporary_files_path))),
-                "project_name": "{}_{}".format(self.base_project_name, benchmark_name) if resynth
-                else self.base_project_name,
-                "resynth": "1" if resynth else "0",
+                "project_name": "{}_{}_{}".format(self.base_project_name, benchmark_name, experiment_type),
                 "kuuga_location_join_syntax": re.sub(
                     "{}".format(os.sep), " ", str(Path(temporary_files_path, "..", "..", "..", "..",
-                                                       "Kuuga").relative_to(temporary_files_path))
-                )
+                                                       "Kuuga").relative_to(temporary_files_path))),
+                "trigger_values": trigger_values,
+                "output_file_location": output_file_location.absolute()
             }
         )
