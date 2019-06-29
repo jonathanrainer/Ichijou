@@ -31,7 +31,6 @@ class Ichijou(object):
         if not self.data_capture_interface.result_present(benchmark_path.stem, experiment_type):
             executable_file = self.compile_benchmark(benchmark_path, experiment_directory, data_offset,
                                                      experiment_type)
-            trigger_values = self.elf_file_interface.extract_trigger_values(executable_file, experiment_type)
             if not self.vcd_interface.does_raw_result_exist(benchmark_path.stem, experiment_type, experiment_directory):
                 # Generate the MEM File for the benchmark
                 mem_file_path = MEMFileGenerator.generate_new_mem_file(
@@ -40,10 +39,12 @@ class Ichijou(object):
                 # Open up Vivado with the correct design
                 self.vivado_interface.setup_experiment(
                     mem_file_path, experiment_directory, benchmark_path.stem,
-                    experiment_type, trigger_values)
+                    experiment_type,
+                self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
             # Take any measurements from the ILA that are necessary (timings etc.)
-            results = self.vcd_interface.extract_results(benchmark_path.stem, experiment_type, experiment_directory,
-                                                         trigger_values)
+            results = self.vcd_interface.extract_results(
+                benchmark_path.stem, experiment_type, experiment_directory,
+                self.elf_file_interface.extract_addr_values_to_find(executable_file))
             self.data_capture_interface.store_result(benchmark_path.stem, experiment_type, results)
         return 0
 

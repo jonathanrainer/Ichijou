@@ -47,7 +47,14 @@ class ELFFileInterface(object):
                                                                       start= starting_index)
                 if int(x[-2:], base=16) in [0xe3, 0x63, 0xef, 0x6f, 0xe7, 0x67]
                 ]
-        if experiment_type != "cc":
+        if experiment_type == "cc":
             return [counter_values[0], counter_values[1], counter_values[-1]]
         else:
             return [counter_values[0], counter_values[0], counter_values[-1]]
+
+    def extract_addr_values_to_find(self, elf_file):
+        with open(str(elf_file.absolute()), 'rb') as elf_fp:
+            elf_file = ELFFile(elf_fp)
+            main_addr = hex(elf_file.get_section_by_name(".symtab").get_symbol_by_name("main")[0].entry.st_value)
+            trap_addr = hex(elf_file.get_section_by_name(".symtab").get_symbol_by_name("_trap")[0].entry.st_value)
+        return [main_addr, trap_addr]
