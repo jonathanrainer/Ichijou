@@ -42,10 +42,10 @@ class Ichijou(object):
                     experiment_type,
                 self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
             # Take any measurements from the ILA that are necessary (timings etc.)
-            results = self.vcd_interface.extract_results(
+            result = self.vcd_interface.extract_results(
                 benchmark_path.stem, experiment_type, experiment_directory,
                 self.elf_file_interface.extract_addr_values_to_find(executable_file))
-            self.data_capture_interface.store_result(benchmark_path.stem, experiment_type, results)
+            self.data_capture_interface.store_result(benchmark_path.stem, experiment_type, result)
         return 0
 
     def compile_benchmark(self, benchmark_path, temporary_file_location, data_offset, experiment_type):

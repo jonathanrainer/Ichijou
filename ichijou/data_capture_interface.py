@@ -20,5 +20,8 @@ class DataCaptureInterface(object):
             self.experiment_type_mapper[experiment_type]
         )["B"]])
 
-    def store_result(self, benchmark_name, experiment_typew):
-        return
+    def store_result(self, benchmark_name, experiment_type, result):
+        workbook = load_workbook(self.results_file)
+        sheet = workbook.get_sheet_by_name(self.experiment_type_mapper[experiment_type])
+        sheet.append(["", benchmark_name, result])
+        workbook.save(self.results_file)
