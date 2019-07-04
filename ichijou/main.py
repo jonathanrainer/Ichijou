@@ -40,7 +40,7 @@ class Ichijou(object):
                 self.vivado_interface.setup_experiment(
                     mem_file_path, experiment_directory, benchmark_path.stem,
                     experiment_type,
-                self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
+                    self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
             # Take any measurements from the ILA that are necessary (timings etc.)
             result = self.vcd_interface.extract_results(
                 benchmark_path.stem, experiment_type, experiment_directory,
@@ -70,5 +70,11 @@ class Ichijou(object):
 
 
 if __name__ == "__main__":
-    system = Ichijou(sys.argv[4])
-    system.run_experiment(Path(sys.argv[1]), sys.argv[2], sys.argv[3])
+    system = Ichijou(sys.argv[3])
+    benchmarks = [x for x in Path(sys.argv[1]).glob('*.c') if x.is_file()]
+    experiment_types = ["nc", "sc", "cc"]
+    experiment_params = [(x, y) for x in benchmarks for y in experiment_types if
+                         not system.data_capture_interface.result_present(x.stem, y)]
+    experiment_params = sorted(experiment_params,key=lambda x: x[0].stem)
+    for param in experiment_params:
+            system.run_experiment(param[0], sys.argv[2], param[1])

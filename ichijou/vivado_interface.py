@@ -62,18 +62,22 @@ class VivadoInterface(object):
         temporary_files_path = Path(temporary_path, "vivado_files")
         os.makedirs(temporary_files_path, exist_ok=True)
         # Check if the top-level file needs re-writing
-        top_level = (self.create_new_top_level(
-            temporary_files_path, Path(temporary_path, "..", "..", "templates"), original_top_level[1],
-            mem_file_paths, original_top_level[2]), original_top_level[1], original_top_level[2])
-        results_files_path = Path(temporary_path, "results",
-                                  "{0}_{1}_ila_results.vcd".format(benchmark, experiment_type))
-        os.makedirs(results_files_path, exist_ok=True)
-        tcl_setup_script_path = self.create_tcl_script(temporary_files_path,
-                                                       Path(temporary_path, "..", "..", "templates"), mem_file_paths,
-                                                       benchmark, top_level, trigger_values, experiment_type,
-                                                       results_files_path)
-        # Call the shell script passing in the correct arguments
-        os.makedirs(Path(temporary_path, "output"), exist_ok=True)
+        if not Path(temporary_files_path, "top_level.v").exists():
+            top_level = (self.create_new_top_level(
+                temporary_files_path, Path(temporary_path, "..", "..", "templates"), original_top_level[1],
+                mem_file_paths, original_top_level[2]), original_top_level[1], original_top_level[2])
+        else:
+            top_level = (Path(temporary_files_path, "top_level.v"), original_top_level[1], original_top_level[2])
+        results_folder_path = Path(temporary_path, "results")
+        results_files_path = Path(results_folder_path, "{0}_{1}_ila_results.vcd".format(benchmark, experiment_type))
+        os.makedirs(results_folder_path, exist_ok=True)
+        if not Path(temporary_files_path, "setup_experiment_environment.tcl").exists():
+            tcl_setup_script_path = self.create_tcl_script(temporary_files_path,
+                                                           Path(temporary_path, "..", "..", "templates"), mem_file_paths,
+                                                           benchmark, top_level, trigger_values, experiment_type,
+                                                           results_files_path)
+        else:
+            tcl_setup_script_path = Path(temporary_files_path, "setup_experiment_environment.tcl")
         subprocess.run(
             "{0} {1}".format(
                 Path(temporary_path, "..", "..", "scripts", "sh", "run_vivado.sh").absolute(), tcl_setup_script_path),
