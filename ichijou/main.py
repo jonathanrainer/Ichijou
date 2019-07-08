@@ -72,7 +72,7 @@ class Ichijou(object):
 if __name__ == "__main__":
     system = Ichijou(sys.argv[3])
     benchmarks = [x for x in Path(sys.argv[1]).glob('*.c') if x.is_file()]
-    experiment_types = ["nc", "sc", "cc"]
+    experiment_types = ["nc", "sc_dm", "sc_nway" "cc_dm", "cc_nway"]
     experiment_params = [(x, y) for x in benchmarks for y in experiment_types if
                          not system.data_capture_interface.result_present(x.stem, y)]
     experiment_params = sorted(experiment_params,key=lambda x: x[0].stem)

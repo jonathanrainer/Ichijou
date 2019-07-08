@@ -30,7 +30,7 @@ class CompilerInterface(object):
 
     def create_boot_program(self, temporary_path, stack_pointer_location, experiment_type):
         return TemplateInterface.create_file_from_template(
-                self.boot_file_repeat_template if experiment_type == "cc" else self.boot_file_template,
+                self.boot_file_repeat_template if "cc" in experiment_type else self.boot_file_template,
                 temporary_path, "boot.S",
                 {
                     "stack_pointer_loc": stack_pointer_location

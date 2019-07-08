@@ -52,7 +52,8 @@ class ELFFileInterface(object):
         else:
             return [counter_values[0], counter_values[0], counter_values[-1]]
 
-    def extract_addr_values_to_find(self, elf_file):
+    @staticmethod
+    def extract_addr_values_to_find(elf_file):
         with open(str(elf_file.absolute()), 'rb') as elf_fp:
             elf_file = ELFFile(elf_fp)
             main_addr = hex(elf_file.get_section_by_name(".symtab").get_symbol_by_name("main")[0].entry.st_value)

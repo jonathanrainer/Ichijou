@@ -50,8 +50,10 @@ class VivadoInterface(object):
     mem_file_instruction_limit = 32768/32
     experiment_type_mapper = {
         "nc": ("kuuga_top_no_cache.v", "kuuga_nc", "kuuga_no_cache"),
-        "sc": ("kuuga_top_simple_cache.v", "kuuga_sc", "kuuga_simple_cache"),
-        "cc": ("kuuga_top_complex_cache.v", "kuuga_cc", "kuuga_complex_cache")
+        "sc_dm": ("kuuga_top_simple_cache_dm.v", "kuuga_sc_dm", "kuuga_simple_cache_dm"),
+        "sc_nway": ("kuuga_top_simple_cache_nway.v", "kuuga_sc_nway", "kuuga_simple_cache_nway"),
+        "cc_dm": ("kuuga_top_complex_cache_dm.v", "kuuga_cc_dm", "kuuga_complex_cache_dm"),
+        "cc_nway": ("kuuga_top_complex_cache_nway.v", "kuuga_cc_nway", "kuuga_complex_cache_nway")
     }
 
     def setup_experiment(self, mem_file_paths, temporary_path, benchmark, experiment_type, trigger_values):
