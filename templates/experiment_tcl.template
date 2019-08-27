@@ -107,7 +107,8 @@ if {![file exist [file join $workDir {{ project_name }}.xpr ]]} {
         set_property CONTROL.DATA_DEPTH 1024 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
         set_property CONTROL.TRIGGER_POSITION 1 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
         set_property CONTROL.WINDOW_COUNT 16 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property TRIGGER_COMPARE_VALUE {eq16'h{{ trigger_values|join(" eq16'h") }}} [get_hw_probes k_top/system_ila_0/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+        set_property TRIGGER_COMPARE_VALUE eq32'h{{ trigger_values[0] }} [get_hw_probes k_top/system_ila_0/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+        set_property TRIGGER_COMPARE_VALUE eq160'h{{ trigger_values[1] }} [get_hw_probes k_top/system_ila_0/inst/probe0_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
         run_hw_ila -force -file $ilaTriggers [get_hw_ilas hw_ila_1]
 
         # Add triggers into the design

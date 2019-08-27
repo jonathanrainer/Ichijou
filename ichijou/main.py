@@ -49,7 +49,7 @@ class Ichijou(object):
                         benchmark_path.stem, experiment_type, experiment_directory,
                         self.elf_file_interface.extract_addr_values_to_find(executable_file))
                 except IndexError:
-                    result = [-1,-1,-1,-1,-1]
+                    result = [-1, -1, -1, -1, -1]
             else:
                 result = [-1, -1, -1, -1, -1]
             self.data_capture_interface.store_result(benchmark_path.stem, experiment_type, result)
