@@ -41,7 +41,7 @@ class CompilerInterface(object):
         output_file = Path(temporary_path, output_file_name)
         #  Compile it
         subprocess.run(
-            "{0}/riscv32-unknown-elf-gcc -nostartfiles {1} {2} -T {3} -o {4}".format(
+            "{0}/riscv32-unknown-elf-gcc -nostartfiles {1} {2} -T {3} -o {4} -lm".format(
                 self.riscv_binary_prefix,
                 boot_file_path,
                 benchmark_path,

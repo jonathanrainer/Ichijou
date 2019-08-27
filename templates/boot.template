@@ -7,10 +7,8 @@ J _trap
 
 .section .boot
 _boot:
-csrwi 0x7A0, 0x2
 li sp, 0x{{ stack_pointer_loc }}
 call main
-csrwi 0x7A0, 0x0
 J _trap
 
 .section .trap

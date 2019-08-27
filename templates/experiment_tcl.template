@@ -129,7 +129,7 @@ if {![file exist [file join $workDir {{ project_name }}.xpr ]]} {
     {# Export the Data from the ILA  #}
 
     refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
-    wait_on_hw_ila [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+    wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
     display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
     write_hw_ila_data -vcd_file {{ output_file_location }} hw_ila_data_1
 

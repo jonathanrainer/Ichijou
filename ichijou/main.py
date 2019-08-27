@@ -23,7 +23,7 @@ class Ichijou(object):
     def __init__(self, results_file):
         self.data_capture_interface = DataCaptureInterface(results_file)
 
-    def run_experiment(self, benchmark_path, experiments_directory, experiment_type):
+    def run_experiment(self, benchmark_path, experiments_directory, experiment_type, unattended_mode=False):
         # Compile the benchmark
         experiment_directory = Path(experiments_directory, "{}_{}".format(benchmark_path.stem, experiment_type))
         os.makedirs(experiment_directory, exist_ok=True)
@@ -42,9 +42,16 @@ class Ichijou(object):
                     experiment_type,
                     self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
             # Take any measurements from the ILA that are necessary (timings etc.)
-            result = self.vcd_interface.extract_results(
-                benchmark_path.stem, experiment_type, experiment_directory,
-                self.elf_file_interface.extract_addr_values_to_find(executable_file))
+            if os.path.exists(self.vcd_interface.get_vcd_file_name(
+                    experiment_directory, benchmark_path.stem, experiment_type)) or not unattended_mode:
+                try:
+                    result = self.vcd_interface.extract_results(
+                        benchmark_path.stem, experiment_type, experiment_directory,
+                        self.elf_file_interface.extract_addr_values_to_find(executable_file))
+                except IndexError:
+                    result = [-1,-1,-1,-1,-1]
+            else:
+                result = [-1, -1, -1, -1, -1]
             self.data_capture_interface.store_result(benchmark_path.stem, experiment_type, result)
         return 0
 
@@ -72,9 +79,9 @@ class Ichijou(object):
 if __name__ == "__main__":
     system = Ichijou(sys.argv[3])
     benchmarks = [x for x in Path(sys.argv[1]).glob('*.c') if x.is_file()]
-    experiment_types = ["nc", "sc_dm", "sc_nway" "cc_dm", "cc_nway"]
+    experiment_types = ["nc", "sc_dm", "sc_nway", "cc_dm", "cc_nway"]
     experiment_params = [(x, y) for x in benchmarks for y in experiment_types if
                          not system.data_capture_interface.result_present(x.stem, y)]
-    experiment_params = sorted(experiment_params,key=lambda x: x[0].stem)
+    experiment_params = sorted(experiment_params, key=lambda x: os.path.getsize(x[0]))
     for param in experiment_params:
-            system.run_experiment(param[0], sys.argv[2], param[1])
+            system.run_experiment(param[0], sys.argv[2], param[1], True)

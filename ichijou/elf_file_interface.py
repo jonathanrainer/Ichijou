@@ -47,7 +47,7 @@ class ELFFileInterface(object):
                                                                       start= starting_index)
                 if int(x[-2:], base=16) in [0xe3, 0x63, 0xef, 0x6f, 0xe7, 0x67]
                 ]
-        if experiment_type == "cc":
+        if "cc" in experiment_type:
             return [counter_values[0], counter_values[1], counter_values[-1]]
         else:
             return [counter_values[0], counter_values[0], counter_values[-1]]
