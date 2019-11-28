@@ -86,51 +86,81 @@ if {![file exist [file join $workDir {{ project_name }}.xpr ]]} {
     }
 
     # Program the Device & Extract the Triggers to a file
-    set triggersBitfile [file join $thisDir {{ benchmark }}_with_triggers.bit]
-    set triggersProbeFile [file join $thisDir {{ benchmark }}_with_triggers.ltx]
-    open_hw
-    disconnect_hw_server -quiet
-    connect_hw_server -url localhost:12345
-    current_hw_target [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
-    set_property PARAM.FREQUENCY 3750000 [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
-    open_hw_target
-    if { ![file exists $triggersBitfile] || ![file exists $triggersProbeFile] } {
-        set_property PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
-        set_property FULL_PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
-        set_property PROGRAM.FILE $raw_bit_file [get_hw_devices xc7vx485t_0]
-        program_hw_devices [get_hw_devices xc7vx485t_0]
-        refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
-        set ilaTriggers [file join $thisDir ila_triggers.tas]
-        set_property CONTROL.TRIGGER_CONDITION OR [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property CONTROL.TRIGGER_MODE BASIC_ONLY [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property CONTROL.CAPTURE_MODE ALWAYS [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property CONTROL.DATA_DEPTH 1024 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property CONTROL.TRIGGER_POSITION 1 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property CONTROL.WINDOW_COUNT 16 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-        set_property TRIGGER_COMPARE_VALUE eq32'h{{ trigger_values[0] }} [get_hw_probes k_top/system_ila_0/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
-        set_property TRIGGER_COMPARE_VALUE eq160'h{{ trigger_values[1] }} [get_hw_probes k_top/system_ila_0/inst/probe0_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
-        run_hw_ila -force -file $ilaTriggers [get_hw_ilas hw_ila_1]
 
-        # Add triggers into the design
-        current_design impl_1
-        refresh_design
-        apply_hw_ila_trigger $ilaTriggers
-
-        write_bitstream -force $triggersBitfile
-        write_debug_probes -force $triggersProbeFile
+    set triggerSettings {
+    	{
+		    {{ benchmark }}_{{ experiment_type }}_with_start_triggers
+		    1
+		    1
+		    32
+		    {{ trigger_values[0] }}
+		    k_top/system_ila_0/inst/probe1_1
+		    {{ benchmark }}_{{ experiment_type }}_ila_results_start.vcd
+            AND
+	    }
+	    {
+		    {{ benchmark }}_{{ experiment_type }}_with_end_triggers
+		    2000
+		    4
+		    32
+		    {{ trigger_values[1] }}
+		    k_top/system_ila_0/inst/probe1_1
+		    {{ benchmark }}_{{ experiment_type }}_ila_results_end.vcd
+            AND
+	    }
     }
 
-    # Program the board so the experiment can be run
+    foreach {settings} $triggerSettings	{
 
-    set_property PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
-    set_property FULL_PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
-    set_property PROGRAM.FILE $triggersBitfile [get_hw_devices xc7vx485t_0]
-    program_hw_devices [get_hw_devices xc7vx485t_0]
+	    set triggersBitfile [file join $thisDir [lindex $settings 0].bit]
+	    set triggersProbeFile [file join $thisDir [lindex $settings 0].ltx]
+	    open_hw
+	    disconnect_hw_server -quiet
+	    connect_hw_server -url localhost:12345
+	    current_hw_target [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+	    set_property PARAM.FREQUENCY 3750000 [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+	    open_hw_target
+	    if { ![file exists $triggersBitfile] || ![file exists $triggersProbeFile] } {
+		set_property PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+		set_property FULL_PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+		set_property PROGRAM.FILE $raw_bit_file [get_hw_devices xc7vx485t_0]
+		program_hw_devices [get_hw_devices xc7vx485t_0]
+		refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
+		set ilaTriggers [file join $thisDir [lindex $settings 0]_ila_triggers.tas]
+		set_property CONTROL.TRIGGER_CONDITION [lindex $settings 7] [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property CONTROL.TRIGGER_MODE BASIC_ONLY [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property CONTROL.CAPTURE_MODE ALWAYS [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property CONTROL.DATA_DEPTH 4096 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property CONTROL.TRIGGER_POSITION [lindex $settings 1] [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property CONTROL.WINDOW_COUNT [lindex $settings 2] [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+		set_property TRIGGER_COMPARE_VALUE eq[lindex $settings 3]'h[lindex $settings 4] [get_hw_probes [lindex $settings 5] -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+        set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_0/inst/probe4_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+		run_hw_ila -force -file $ilaTriggers [get_hw_ilas hw_ila_1]
 
-    {# Export the Data from the ILA  #}
+		# Add triggers into the design
+		current_design impl_1
+		refresh_design
+		apply_hw_ila_trigger $ilaTriggers
 
-    refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
-    wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
-    display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
-    write_hw_ila_data -vcd_file {{ output_file_location }} hw_ila_data_1
+		write_bitstream -force $triggersBitfile
+		write_debug_probes -force $triggersProbeFile
+	    }
+
+	    set vcdFile [file join $thisDir .. results [lindex $settings 6]]
+
+	    if {![file exists $vcdFile]} {
+
+	    # Program the board so the experiment can be run
+
+	    set_property PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
+	    set_property FULL_PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
+	    set_property PROGRAM.FILE $triggersBitfile [get_hw_devices xc7vx485t_0]
+	    program_hw_devices [get_hw_devices xc7vx485t_0]
+
+	    refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
+	    wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+	    display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+	    write_hw_ila_data -force -vcd_file $vcdFile hw_ila_data_1
+            }
+}
 

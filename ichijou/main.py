@@ -27,7 +27,7 @@ class Ichijou(object):
         # Compile the benchmark
         experiment_directory = Path(experiments_directory, "{}_{}".format(benchmark_path.stem, experiment_type))
         os.makedirs(experiment_directory, exist_ok=True)
-        data_offset = 0x10000
+        data_offset = 0x100000
         if not self.data_capture_interface.result_present(benchmark_path.stem, experiment_type):
             executable_file = self.compile_benchmark(benchmark_path, experiment_directory, data_offset,
                                                      experiment_type)
@@ -42,13 +42,13 @@ class Ichijou(object):
                     experiment_type,
                     self.elf_file_interface.extract_trigger_values(executable_file, experiment_type))
             # Take any measurements from the ILA that are necessary (timings etc.)
-            if os.path.exists(self.vcd_interface.get_vcd_file_name(
-                    experiment_directory, benchmark_path.stem, experiment_type)) or not unattended_mode:
+            if self.vcd_interface.does_raw_result_exist(benchmark_path.stem, experiment_type, experiment_directory)\
+                    or not unattended_mode:
                 try:
                     result = self.vcd_interface.extract_results(
                         benchmark_path.stem, experiment_type, experiment_directory,
                         self.elf_file_interface.extract_addr_values_to_find(executable_file))
-                except IndexError:
+                except (IndexError, KeyError):
                     result = [-1, -1, -1, -1, -1]
             else:
                 result = [-1, -1, -1, -1, -1]

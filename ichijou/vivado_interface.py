@@ -120,6 +120,7 @@ class VivadoInterface(object):
                     "{}".format(os.sep), " ", str(Path(temporary_files_path, "..", "..", "..", "..",
                                                        "Kuuga").relative_to(temporary_files_path))),
                 "trigger_values": trigger_values,
-                "output_file_location": output_file_location.absolute()
+                "output_file_location": output_file_location.absolute(),
+                "experiment_type": experiment_type
             }
         )

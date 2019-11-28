@@ -14,29 +14,34 @@ class VCDInterface(object):
     ]
 
     @staticmethod
-    def get_vcd_file_name(experiment_directory, benchmark, experiment_type):
-        return Path(experiment_directory, "results", "{}_{}_ila_results.vcd".format(benchmark, experiment_type))
+    def get_vcd_file_name(experiment_directory, benchmark, experiment_type, position):
+        return Path(experiment_directory, "results", "{}_{}_ila_results_{}.vcd".format(benchmark, experiment_type,
+                                                                                       position))
 
     @staticmethod
     def does_raw_result_exist(benchmark, experiment_type, experiment_directory):
-        result_file = Path(experiment_directory, "results", "{0}_{1}_ila_results.vcd".format(benchmark, experiment_type))
-        return result_file.exists()
+        result_file_start = Path(experiment_directory, "results", "{0}_{1}_ila_results_start.vcd".format(
+            benchmark, experiment_type))
+        result_file_end = Path(experiment_directory, "results", "{0}_{1}_ila_results_end.vcd".format(
+            benchmark,experiment_type))
+        return result_file_start.exists() and result_file_end.exists()
 
     def extract_results(self, benchmark, experiment_type, experiment_directory, addr_values_to_find):
-        vcd_file = parse_vcd(self.get_vcd_file_name(experiment_directory, benchmark, experiment_type))
-        start_addr_time = self.get_addr_time(vcd_file, addr_values_to_find[0], 0, "cc" in experiment_type)
-        start_time = self.get_start_time_from_addr_time(start_addr_time, vcd_file)
-        end_addr_time = self.get_addr_time(vcd_file, addr_values_to_find[1], 3, False)
-        end_time = self.get_start_time_from_addr_time(end_addr_time, vcd_file)
+        start_vcd_file = parse_vcd(self.get_vcd_file_name(experiment_directory, benchmark, experiment_type, "start"))
+        start_addr_time = self.get_addr_time(start_vcd_file, addr_values_to_find[0], 0, "cc" in experiment_type)
+        start_time = self.get_start_time_from_addr_time(start_addr_time, start_vcd_file)
+        end_vcd_file = parse_vcd(self.get_vcd_file_name(experiment_directory, benchmark, experiment_type, "end"))
+        end_addr_time = self.get_addr_time(end_vcd_file, addr_values_to_find[1], 3, False)
+        end_time = self.get_start_time_from_addr_time(end_addr_time, end_vcd_file)
         results = [end_time[0] - start_time[0]]
-        counter_values = self.extract_counter_values(start_time[1], end_time[1], vcd_file)
+        counter_values = self.extract_counter_values(start_time[1], end_time[1], start_vcd_file, end_vcd_file)
         return results + counter_values
 
     @staticmethod
     def get_addr_time(vcd_file, addr_value, offset, last_flag):
         addr_values = \
             [x['tv'] for x in vcd_file.values() if
-             x['nets'][0]["name"] == "k_top/system_ila_0/inst/probe1_1[15:0]"][0]
+             x['nets'][0]["name"] == "k_top/system_ila_0/inst/probe1_1[31:0]"][0]
         if last_flag:
             return [x for x in addr_values if int(x[1], base=2) == int(addr_value, base=16)][-1][0]
         else:
@@ -58,11 +63,12 @@ class VCDInterface(object):
         else:
             return exact_match[0]
 
-    def extract_counter_values(self, start_ila_time, end_ila_time, vcd_file):
+    def extract_counter_values(self, start_ila_time, end_ila_time, start_vcd_file, end_vcd_file):
         results = []
         for probe in self.probes:
-            counter_values = [x['tv'] for x in vcd_file.values() if x['nets'][0]["name"] == probe][0]
-            start_value = int([x for x in counter_values if x[0] <= start_ila_time][-1][1], base=2)
-            end_value = int([x for x in counter_values if x[0] <= end_ila_time][-1][1], base=2)
+            start_counter_values = [x['tv'] for x in start_vcd_file.values() if x['nets'][0]["name"] == probe][0]
+            end_counter_values = [x['tv'] for x in end_vcd_file.values() if x['nets'][0]["name"] == probe][0]
+            start_value = int([x for x in start_counter_values if x[0] <= start_ila_time][-1][1], base=2)
+            end_value = int([x for x in end_counter_values if x[0] <= end_ila_time][-1][1], base=2)
             results.append(end_value - start_value)
         return results

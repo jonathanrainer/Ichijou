@@ -25,7 +25,9 @@ SECTIONS
 	}>instruction
 	.= {{ data_start }};
     .rodata : { *(.rodata) }>data
+    . = ALIGN(32 / 8);
 	.data : { *(.data) }>data
+    . = ALIGN(32 / 8);
 	.bss : {
         *(.bss)
         . = ALIGN(. != 0 ? 32 / 8 : 1);

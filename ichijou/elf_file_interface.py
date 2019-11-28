@@ -1,5 +1,6 @@
 from elftools.elf.elffile import ELFFile
-
+import struct
+from math import ceil
 
 class ELFFileInterface(object):
 
@@ -10,7 +11,7 @@ class ELFFileInterface(object):
                 [".reset", ".illegal_instruction", ".text"], elf_file
             )
             data_memory_contents = self.extract_sections(
-                [".rodata", ".bss", ".data"], elf_file
+                [".rodata", ".bss", ".data", ".sbss", ".sdata"], elf_file
             )
             result = {
                 "instruction": sorted(instruction_memory_contents, key=lambda a: a[0]),
@@ -26,10 +27,14 @@ class ELFFileInterface(object):
                 raw_bytes = bytearray(elf_file.get_section_by_name(section_name).data())
             except AttributeError:
                 continue
-            raw_bytes.reverse()
-            hex_string = raw_bytes.hex()
+            if elf_file.get_section_by_name(section_name).header['sh_type'] == "SHT_NOBITS":
+                hex_string = "0" * elf_file.get_section_by_name(section_name).header['sh_size']
+            else:
+                raw_bytes.reverse()
+                hex_string = raw_bytes.hex()
             instructions = [hex_string[i:i + 8] for i in range(0, len(hex_string), 8)]
             instructions.reverse()
+            # There's more complexity when splitting data stuff that doesn't 100% align properly
             results.append(
                 (elf_file.get_section_by_name(section_name).header["sh_addr"] // 4,
                  instructions)
@@ -48,21 +53,12 @@ class ELFFileInterface(object):
                                                                              start=starting_index)
                 if int(x[-2:], base=16) in [0xe3, 0x63, 0xef, 0x6f, 0xe7, 0x67]
                 ]
-            # Work out what the last entry to the trace should look like and use that as the end point
-            # Calculate the last address in main
-            main_symbol_table_entry = elf_file.get_section_by_name(".symtab").get_symbol_by_name("main")[0].entry
-            last_addr = main_symbol_table_entry.st_value + main_symbol_table_entry.st_size - 4
-            end_of_main_index = last_addr // 4 - text_section[0]
-            # Now work backwards through the main section until you find an LW or SW command
-            for instruction in reversed(list(enumerate(text_section[1][:end_of_main_index+1], start=end_of_main_index+1
-                                                       ))):
-                if int(instruction[1][-2:], base=16) in [0x83, 0x03, 0xa3, 0x23]:
-                    trace_template = self.add_underscores_to_trigger_values(
-                        "{}{:08x}{}".format(instruction[1], text_section[0] + instruction[0] * 4, (3*8) * "x").upper()
-                    )
-                    break
-            return [self.add_underscores_to_trigger_values("{:08x}".format(int(counter_values[0], base=16))),
-                    trace_template]
+            if "cc" in experiment_type:
+                return [self.add_underscores_to_trigger_values("{:08x}".format(int(counter_values[1], base=16))),
+                        self.add_underscores_to_trigger_values("{:08x}".format(int(counter_values[-1], base=16)))]
+            else:
+                return [self.add_underscores_to_trigger_values("{:08x}".format(int(counter_values[0], base=16))),
+                        self.add_underscores_to_trigger_values("{:08x}".format(int(counter_values[-1], base=16)))]
 
     @staticmethod
     def extract_addr_values_to_find(elf_file):
