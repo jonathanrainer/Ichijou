@@ -43,7 +43,13 @@ class VCDInterface(object):
             [x['tv'] for x in vcd_file.values() if
              x['nets'][0]["name"] == "k_top/system_ila_0/inst/probe1_1[31:0]"][0]
         if last_flag:
-            return [x for x in addr_values if int(x[1], base=2) == int(addr_value, base=16)][-1][0]
+            matching_vals = [x for x in addr_values if int(x[1], base=2) == int(addr_value, base=16)]
+            hit_count_values = \
+                [x['tv'] for x in vcd_file.values() if
+                 x['nets'][0]["name"] == "k_top/system_ila_0/inst/probe7_1[31:0]"][0]
+            for match in matching_vals:
+                if len(hit_count_values) == 1 or hit_count_values[1][0] > match[0]:
+                    return match[0]
         else:
             return [x for x in addr_values if int(x[1], base=2) == int(addr_value, base=16)][offset][0]
 
