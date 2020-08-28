@@ -194,6 +194,7 @@ fabric.properties
 .idea/
 benchmarks
 experiments/
+gap_experiments/
 data/
 archive/
 logs/

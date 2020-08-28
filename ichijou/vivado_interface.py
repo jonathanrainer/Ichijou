@@ -53,7 +53,12 @@ class VivadoInterface(object):
         "sc_dm": ("kuuga_top_simple_cache_dm.v", "kuuga_sc_dm", "kuuga_simple_cache_dm"),
         "sc_nway": ("kuuga_top_simple_cache_nway.v", "kuuga_sc_nway", "kuuga_simple_cache_nway"),
         "cc_dm": ("kuuga_top_complex_cache_dm.v", "kuuga_cc_dm", "kuuga_complex_cache_dm"),
-        "cc_nway": ("kuuga_top_complex_cache_nway.v", "kuuga_cc_nway", "kuuga_complex_cache_nway")
+        "cc_nway": ("kuuga_top_complex_cache_nway.v", "kuuga_cc_nway", "kuuga_complex_cache_nway"),
+        "nc_mg": ("kuuga_top_no_cache.v", "kuuga_nc_mg", "kuuga_no_cache_mg"),
+        "sc_dm_mg": ("kuuga_top_simple_cache_dm.v", "kuuga_sc_dm_mg", "kuuga_simple_cache_dm_mg"),
+        "sc_nway_mg": ("kuuga_top_simple_cache_nway.v", "kuuga_sc_nway_mg", "kuuga_simple_cache_nway_mg"),
+        "cc_dm_mg": ("kuuga_top_complex_cache_dm.v", "kuuga_cc_dm_mg", "kuuga_complex_cache_dm_mg"),
+        "cc_nway_mg": ("kuuga_top_complex_cache_nway.v", "kuuga_cc_nway_mg", "kuuga_complex_cache_nway_mg")
     }
 
     def setup_experiment(self, mem_file_paths, temporary_path, benchmark, experiment_type, trigger_values):
@@ -75,9 +80,11 @@ class VivadoInterface(object):
         os.makedirs(results_folder_path, exist_ok=True)
         if not Path(temporary_files_path, "setup_experiment_environment.tcl").exists():
             tcl_setup_script_path = self.create_tcl_script(temporary_files_path,
-                                                           Path(temporary_path, "..", "..", "templates"), mem_file_paths,
-                                                           benchmark, top_level, trigger_values, experiment_type,
-                                                           results_files_path)
+                                                           Path(temporary_path, "..", "..", "templates"),
+                                                           mem_file_paths, benchmark, top_level, trigger_values,
+                                                           experiment_type, results_files_path,
+                                                           "experiment_mg_tcl.template" if ("mg" in experiment_type)
+                                                           else "experiment_tcl.template")
         else:
             tcl_setup_script_path = Path(temporary_files_path, "setup_experiment_environment.tcl")
         subprocess.run(
@@ -102,10 +109,11 @@ class VivadoInterface(object):
         )
 
     def create_tcl_script(self, temporary_files_path, templates_path, mem_file_paths, benchmark_name, top_level,
-                          trigger_values, experiment_type, output_file_location):
+                          trigger_values, experiment_type, output_file_location, template_name="experiment_tcl.template"
+                          ):
         project_location = Path(temporary_files_path, "..", "vivado_project")
         return TemplateInterface.create_file_from_template(
-            Path(templates_path, "experiment_tcl.template"),
+            Path(templates_path, template_name),
             temporary_files_path,
             "setup_experiment_environment.tcl",
             {

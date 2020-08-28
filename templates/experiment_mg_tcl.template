@@ -1,0 +1,176 @@
+# Get the directory where this script resides and set up the other important locations
+set thisDir 	        [file dirname [info script]]
+set workDir 	        [file join $thisDir {{ project_location_join_syntax }}]
+set kuugaDir            [file join $thisDir {{ kuuga_location_join_syntax }}]
+set godaiDir	        [file join $kuugaDir Godai]
+set gouramDir 	        [file join $kuugaDir Gouram]
+set core2AXIDir	        [file join $kuugaDir core2axi]
+set instContents        [file join $thisDir .. mem {{ instruction_memory_file }}]
+set dataContents        [file join $thisDir .. mem {{ data_memory_file }}]
+set finalBitfile        [file join $thisDir .. output {{ benchmark }}.bit]
+
+set projectName {{ project_name }}
+
+# Check whether the project exists or not, if it doesn't then it needs to be created
+
+if {![file exist [file join $workDir {{ project_name }}.xpr ]]} {
+
+    source [file join $godaiDir scripts godai_manifest.tcl]
+    source [file join $gouramDir scripts gouram_manifest.tcl]
+    source [file join $core2AXIDir scripts core2axi_manifest.tcl]
+    source [file join $kuugaDir scripts kuuga_manifest.tcl]
+
+    set RTLFileListNames [concat [list $core2AXIRTLFiles $core2AXIDir] [list $GodaiRTLFiles $godaiDir] [list $GouramRTLFiles $gouramDir] [list $KuugaRTLFiles $kuugaDir]]
+    set IncludeFileListNames [concat [list $GodaiIncludeFiles $godaiDir] [list $GouramIncludeFiles $gouramDir] [list $KuugaIncludeFiles $kuugaDir]]
+
+    set rtlFilesFull {}
+    set includeFilesFull {}
+
+    foreach {ls dir} $RTLFileListNames {
+        foreach f $ls {
+            lappend rtlFilesFull [file join $dir rtl $f]
+        }
+    }
+
+    foreach {ls dir} $IncludeFileListNames {
+        foreach f $ls {
+            lappend includeFilesFull [file join $dir include $f]
+        }
+    }
+
+    # Create project
+    create_project -part xc7vx485tffg1761-2  -force $projectName [file join $workDir]
+
+    add_files -fileset sources_1 [file join $thisDir {{ top_level[0] }}]
+    add_files -fileset sources_1 $instContents
+    add_files -fileset sources_1 $dataContents
+    add_files -norecurse $rtlFilesFull
+    add_files -norecurse $includeFilesFull
+
+    # Set the directory path for the new project
+    set proj_dir [get_property directory [current_project]]
+
+    # Set project properties
+    set obj [get_projects $projectName]
+    set_property "board_part" "xilinx.com:vc707:part0:1.0" $obj
+    set_property "simulator_language" "Mixed" $obj
+    set_property "target_language" "Verilog" $obj
+
+    source [file join $kuugaDir scripts block_diagrams {{ top_level[2] }}.tcl]
+
+} else {
+    open_project [file join $workDir {{ project_name }}.xpr]
+}
+
+# If we need to re-synthesise and re-implement then do both of those so we have access to the bitfile
+	
+    {# Check if Top Level is already there so there's no need to reset it #}
+ 
+    set_property top {{ top_level[1] }} [current_fileset]
+
+    {% for x in ["synth_1", "impl_1"] %}
+    if { [get_property NEEDS_REFRESH [get_runs {{ x }}]] || [get_property STATUS [get_runs {{ x }}]] == "Not started" } {
+        reset_run {{ x }}
+        launch_runs -jobs 4 {{ x }}
+        wait_on_run {{ x }}
+    }
+    {% endfor %}
+
+    # Create the baseline bit file & probes file and write them out to a known location
+    set raw_bit_file [file join $thisDir {{ benchmark }}_raw.bit]
+    set raw_probes_file [file join $thisDir {{ benchmark }}_debug_probes.ltx]
+    open_run impl_1
+    if { ![file exists $raw_bit_file] || ![file exists $raw_probes_file] } {
+        write_bitstream -force $raw_bit_file
+        write_debug_probes -force $raw_probes_file
+    }
+
+    # Program the Device & Extract the Triggers to a file
+
+	    set triggersBitfile [file join $thisDir {{ benchmark }}_{{ experiment_type }}_with_triggers.bit]
+	    set triggersProbeFile [file join $thisDir {{ benchmark }}_{{ experiment_type }}_with_triggers.ltx]
+	    open_hw
+	    disconnect_hw_server -quiet
+	    connect_hw_server -url localhost:12345
+	    current_hw_target [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+	    set_property PARAM.FREQUENCY 3750000 [get_hw_targets */xilinx_tcf/Digilent/000000007071A]
+	    open_hw_target
+	    if { ![file exists $triggersBitfile] || ![file exists $triggersProbeFile] } {
+		set_property PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+		set_property FULL_PROBES.FILE $raw_probes_file [get_hw_devices xc7vx485t_0]
+		set_property PROGRAM.FILE $raw_bit_file [get_hw_devices xc7vx485t_0]
+		program_hw_devices [get_hw_devices xc7vx485t_0]
+		refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
+		set gapIlaTriggers [file join $thisDir {{ benchmark }}_{{ experiment_type }}_memory_gap_ila_triggers.tas]
+        set addrIlaTriggers [file join $thisDir {{ benchmark }}_{{ experiment_type }}_memory_addr_ila_triggers.tas]
+        set startIlaTriggers [file join $thisDir {{ benchmark }}_{{ experiment_type }}_start_time_ila_trigger.tas]
+		set_property CONTROL.TRIGGER_CONDITION AND [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0]]
+
+		set_property CONTROL.DATA_DEPTH 1 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -regexp ".*ila_[1-2].*"]
+		set_property CONTROL.TRIGGER_POSITION 0 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -regexp ".*ila_[1-2].*"]
+		set_property CONTROL.WINDOW_COUNT 131072 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -regexp ".*ila_[1-2].*"]
+
+        set_property CONTROL.DATA_DEPTH 16384 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]
+		set_property CONTROL.TRIGGER_POSITION 0 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]
+		set_property CONTROL.WINDOW_COUNT 1 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]
+
+
+        # Set up triggers per ILA
+
+		set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes k_top/system_ila_0/inst/probe0_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+        set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes k_top/system_ila_1/inst/probe0_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]]
+        {% if 'cc' in experiment_type %}
+            set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_0/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+            set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes k_top/system_ila_0/inst/probe2_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+
+            set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_1/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]]
+            set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_1/inst/probe2_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]]
+        {% else %}
+            set_property TRIGGER_COMPARE_VALUE eq1'bR [get_hw_probes k_top/system_ila_0/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+
+            set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_1/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]]
+        {% endif %}
+
+        set_property TRIGGER_COMPARE_VALUE eq32'h{{trigger_values[0]}} [get_hw_probes  k_top/system_ila_2/inst/probe2_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]]
+        set_property TRIGGER_COMPARE_VALUE eq1'h1  [get_hw_probes k_top/system_ila_2/inst/probe1_1 -of_objects [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]]
+
+		run_hw_ila -force -file $gapIlaTriggers [get_hw_ilas hw_ila_1]
+        run_hw_ila -force -file $addrIlaTriggers [get_hw_ilas hw_ila_2]
+        run_hw_ila -force -file $startIlaTriggers [get_hw_ilas hw_ila_3]
+
+		# Add triggers into the design
+		current_design impl_1
+		refresh_design
+		apply_hw_ila_trigger $gapIlaTriggers
+        apply_hw_ila_trigger $addrIlaTriggers
+        apply_hw_ila_trigger $startIlaTriggers
+
+		write_bitstream -force $triggersBitfile
+		write_debug_probes -force $triggersProbeFile
+	    }
+
+	    set gapVcdFile [file join $thisDir .. results gap_ila_results.vcd]
+        set addrVcdFile [file join $thisDir .. results addr_ila_results.vcd]
+        set startVcdFile [file join $thisDir .. results start_ila_results.vcd]
+
+	    if {![file exists $gapVcdFile] || ![file exists $addrVcdFile] || ![file exists $startVcdFile] } {
+
+	    # Program the board so the experiment can be run
+
+	    set_property PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
+	    set_property FULL_PROBES.FILE $triggersProbeFile [get_hw_devices xc7vx485t_0]
+	    set_property PROGRAM.FILE $triggersBitfile [get_hw_devices xc7vx485t_0]
+	    program_hw_devices [get_hw_devices xc7vx485t_0]
+
+	    refresh_hw_device [lindex [get_hw_devices xc7vx485t_0] 0]
+	    wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]
+        wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]
+        wait_on_hw_ila -timeout 2 [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]
+	    display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_0/inst/ila_lib"}]]
+        display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_1/inst/ila_lib"}]]
+        display_hw_ila_data [upload_hw_ila_data [get_hw_ilas -of_objects [get_hw_devices xc7vx485t_0] -filter {CELL_NAME=~"k_top/system_ila_2/inst/ila_lib"}]]
+        write_hw_ila_data -force -vcd_file $gapVcdFile hw_ila_data_1
+        write_hw_ila_data -force -vcd_file $addrVcdFile hw_ila_data_2
+        write_hw_ila_data -force -vcd_file $startVcdFile hw_ila_data_3
+            }
+

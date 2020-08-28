@@ -71,7 +71,7 @@ if {![file exist [file join $workDir {{ project_name }}.xpr ]]} {
     {% for x in ["synth_1", "impl_1"] %}
     if { [get_property NEEDS_REFRESH [get_runs {{ x }}]] || [get_property STATUS [get_runs {{ x }}]] == "Not started" } {
         reset_run {{ x }}
-        launch_runs -jobs 1 {{ x }}
+        launch_runs -jobs 4 {{ x }}
         wait_on_run {{ x }}
     }
     {% endfor %}
